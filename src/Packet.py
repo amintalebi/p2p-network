@@ -181,14 +181,20 @@ from struct import *
 
 
 class Packet:
+    HEADER_SIZE = 20
+
     def __init__(self, buf):
         """
         The decoded buffer should convert to a new packet.
 
         :param buf: Input buffer was just decoded.
-        :type buf: bytearray
+        :type buf: str
         """
-        pass
+        version_str, type_str, length_str, self.source_server_ip, self.source_server_port, self.body = buf.split('|')
+        self.version = int(version_str)
+        self.type = int(type_str)
+        self.length = int(length_str)
+        self.header = version_str + '|' + self.type + '|' + self.source_server_ip + '|' + self.source_server_port
 
     def get_header(self):
         """
@@ -196,7 +202,7 @@ class Packet:
         :return: Packet header
         :rtype: str
         """
-        pass
+        return self.header
 
     def get_version(self):
         """
@@ -204,7 +210,7 @@ class Packet:
         :return: Packet Version
         :rtype: int
         """
-        pass
+        return self.version
 
     def get_type(self):
         """
@@ -212,7 +218,7 @@ class Packet:
         :return: Packet type
         :rtype: int
         """
-        pass
+        return self.type
 
     def get_length(self):
         """
@@ -220,7 +226,7 @@ class Packet:
         :return: Packet length
         :rtype: int
         """
-        pass
+        return self.length
 
     def get_body(self):
         """
@@ -228,7 +234,7 @@ class Packet:
         :return: Packet body
         :rtype: str
         """
-        pass
+        return self.body
 
     def get_buf(self):
         """
@@ -237,7 +243,11 @@ class Packet:
         :return The parsed packet to the network format.
         :rtype: bytearray
         """
-        pass
+
+        ip_part1_str, ip_part2_str, ip_part3_str, ip_part4_str = self.source_server_ip.split('.')
+
+        return pack('!HHLHHHHL' + str(len(self.body)) + 'c', self.version, self.type, self.length, int(ip_part1_str),
+                    int(ip_part2_str), int(ip_part3_str), int(ip_part4_str), int(self.source_server_port), self.body)
 
     def get_source_server_ip(self):
         """
@@ -245,7 +255,7 @@ class Packet:
         :return: Server IP address for the sender of the packet.
         :rtype: str
         """
-        pass
+        return self.source_server_ip
 
     def get_source_server_port(self):
         """
@@ -253,7 +263,7 @@ class Packet:
         :return: Server Port address for the sender of the packet.
         :rtype: str
         """
-        pass
+        return self.source_server_port
 
     def get_source_server_address(self):
         """
@@ -261,7 +271,7 @@ class Packet:
         :return: Server address; The format is like ('192.168.001.001', '05335').
         :rtype: tuple
         """
-        pass
+        return self.source_server_ip, self.source_server_port
 
 
 class PacketFactory:
@@ -280,7 +290,18 @@ class PacketFactory:
         :rtype: Packet
 
         """
-        pass
+        raw_header, raw_body = unpack_from(str(Packet.HEADER_SIZE) + 's' + str(len(buffer) - Packet.HEADER_SIZE) + 's',
+                                           buffer, offset=0)
+        version, packet_type, length, raw_source_server_ip, source_server_port = unpack('!HHL8sL', raw_header)
+        ip_part1, ip_part2, ip_part3, ip_part4 = unpack('!4H', raw_source_server_ip)
+        source_server_ip = str(ip_part1) + '.' + str(ip_part2) + '.' + str(ip_part3) + '.' + str(ip_part4)
+
+        body = raw_body.decode('utf-8')
+
+        string_buffer = str(
+            str(part) + '|' for part in [version, packet_type, length, source_server_ip, source_server_port, body])[:-1]
+
+        return Packet(string_buffer)
 
     @staticmethod
     def new_reunion_packet(type, source_address, nodes_array):
