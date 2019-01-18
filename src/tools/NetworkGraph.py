@@ -9,19 +9,32 @@ class GraphNode:
         :type address: tuple
 
         """
-        pass
+        self.address = address
+        self.parent = None
+        self.right = None
+        self.left = None
+        self.alive = False
 
     def set_parent(self, parent):
-        pass
+        self.parent = parent
 
     def set_address(self, new_address):
-        pass
+        self.address = new_address
 
     def __reset(self):
-        pass
+        self.parent = None
+        self.right = None
+        self.left = None
+        self.alive = False
 
     def add_child(self, child):
-        pass
+        if self.right is None:
+            self.right = child
+        else:
+            self.left = child
+
+    def can_be_neighbour(self):
+        return not (self.right and self.left)
 
 
 class NetworkGraph:
@@ -47,20 +60,60 @@ class NetworkGraph:
 
         :return: Best neighbour for sender.
         :rtype: GraphNode
+
         """
-        pass
+
+        try:
+            assert self.find_node(sender[0], sender[1]) is None
+        except AssertionError:
+            print('sender is already in network graph')
+
+        root = self.root
+        to_visit = [root]
+
+        while to_visit:
+            current = to_visit.pop(0)
+            if current.can_be_neghbour:
+                return current.address
+
+            if current.left:
+                to_visit.append(current.left)
+            if current.right:
+                to_visit.append(current.right)
 
     def find_node(self, ip, port):
-        pass
+        address = (ip, port)
+
+        root = self.root
+        to_visit = [root]
+
+        while to_visit:
+            current = to_visit.pop(0)
+            if current.address == address:
+                return current
+
+            if current.left:
+                to_visit.append(current.left)
+            if current.right:
+                to_visit.append(current.right)
+
+        return None
 
     def turn_on_node(self, node_address):
-        pass
+        node = self.find_node(node_address[0], node_address[1])
+        node.alive = True
 
     def turn_off_node(self, node_address):
-        pass
+        node = self.find_node(node_address[0], node_address[1])
+        node.alive = False
 
     def remove_node(self, node_address):
-        pass
+        node = self.find_node(node_address[0], node_address[1])
+        node.alive = False
+        if node.right:
+            self.remove_node(node.right.address)
+        if node.left:
+            self.remove_node(node.left.address)
 
     def add_node(self, ip, port, father_address):
         """
@@ -78,7 +131,15 @@ class NetworkGraph:
         :type port: int
         :type father_address: tuple
 
-
         :return:
         """
-        pass
+        node_address = (ip, port)
+        father = self.find_live_node(node_address)
+
+        new_node = GraphNode(node_address)
+        new_node.set_parent(father)
+
+        father.add_child(new_node)
+
+
+

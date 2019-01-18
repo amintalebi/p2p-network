@@ -42,7 +42,18 @@ class Peer:
         :type is_root: bool
         :type root_address: tuple
         """
-        pass
+        self.stream = Stream(server_ip, server_port)
+        self.packet_factory = PacketFactory()
+        self.ui = UserInterface()
+        self.network_graph = None
+        self.neighbour = self.__get_neighbour((server_ip, server_port))
+
+        if is_root:
+            self.network_graph = NetworkGraph(GraphNode((server_ip, server_port)))
+            # TODO reunion daemon
+        else:
+            # TODO connect to the root of the network
+            pass
 
     def start_user_interface(self):
         """
@@ -282,4 +293,5 @@ class Peer:
         :param sender: Sender of the packet
         :return: The specified neighbour for the sender; The format is like ('192.168.001.001', '05335').
         """
-        pass
+        return self.network_graph.find_live_node(sender).address
+
