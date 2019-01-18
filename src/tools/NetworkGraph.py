@@ -73,8 +73,10 @@ class NetworkGraph:
 
         while to_visit:
             current = to_visit.pop(0)
-            if current.can_be_neghbour:
-                return current.address
+
+            if current.can_be_neghbour():
+                self.add_node(sender[0], sender[1], current.address)
+                return current
 
             if current.left:
                 to_visit.append(current.left)
@@ -133,10 +135,9 @@ class NetworkGraph:
 
         :return:
         """
-        node_address = (ip, port)
-        father = self.find_live_node(node_address)
+        father = self.find_node(father_address[0], father_address[1])
 
-        new_node = GraphNode(node_address)
+        new_node = GraphNode((ip, port))
         new_node.set_parent(father)
 
         father.add_child(new_node)
