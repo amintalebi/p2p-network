@@ -1,10 +1,10 @@
 from src.tools.simpletcp.tcpserver import TCPServer
-from src.Peer import Peer
 from src.tools.Node import Node
 import threading
 
 
 class Stream:
+    ROOT_ADDRESS = ()
 
     def __init__(self, ip, port):
         """
@@ -36,13 +36,13 @@ class Stream:
             queue.put(bytes('ACK', 'utf8'))
             self._server_in_buf.append(data)
 
-        self.tcp_server = TCPServer(mode=ip, port=port, read_callback=callback)
+        self.tcp_server = TCPServer(mode=ip, port=int(port), read_callback=callback)
 
-        server_thread = threading.Thread(target=self.tcp_server.run())
-        server_thread.run()
+        server_thread = threading.Thread(target=self.tcp_server.run)
+        server_thread.start()
 
-        if (ip, port) != Peer.ROOT_ADDRESS:
-            self.add_node(Peer.ROOT_ADDRESS, set_register_connection=True)
+        if (ip, port) != self.ROOT_ADDRESS:
+            self.add_node(self.ROOT_ADDRESS, set_register_connection=True)
 
     def get_server_address(self):
         """
@@ -72,6 +72,7 @@ class Stream:
 
         :return:
         """
+
         new_node = Node(server_address, set_register=set_register_connection)
         self.nodes[str((new_node.server_ip, new_node.server_port))] = new_node
 
@@ -171,8 +172,10 @@ class Stream:
         """
         if only_register:
             register_node = self.nodes[
-                str((Node.parse_ip(Peer.ROOT_ADDRESS[0]), Node.parse_port(Peer.ROOT_ADDRESS[1])))]
+                str((Node.parse_ip(self.ROOT_ADDRESS[0]), Node.parse_port(self.ROOT_ADDRESS[1])))]
             self.send_messages_to_node(register_node)
         else:
             for node in list(self.nodes.keys()):
                 self.send_messages_to_node(self.nodes[node])
+
+

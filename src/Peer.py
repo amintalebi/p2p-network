@@ -1,7 +1,6 @@
 from src.Stream import Stream
 from src.Packet import Packet, PacketFactory
 from src.UserInterface import UserInterface
-from src.tools.SemiNode import SemiNode
 from src.tools.NetworkGraph import NetworkGraph, GraphNode
 import time
 import threading
@@ -15,7 +14,6 @@ import threading
 
 
 class Peer:
-    ROOT_ADDRESS = ()
 
     def __init__(self, server_ip, server_port, is_root=False, root_address=None):
         """
@@ -48,15 +46,15 @@ class Peer:
         self.packet_factory = PacketFactory()
         self.ui = UserInterface()
         self.network_graph = None
-        self.neighbour = self.__get_neighbour((server_ip, server_port))
+        self.neighbour = None
 
         if is_root:
             self.network_graph = NetworkGraph(GraphNode((server_ip, server_port)))
-            Peer.ROOT_ADDRESS = (server_ip, server_port)
+
             # TODO reunion daemon
         else:
             # TODO connect to the root of the network
-            pass
+            self.neighbour = self.__get_neighbour((server_ip, server_port))
 
     def start_user_interface(self):
         """

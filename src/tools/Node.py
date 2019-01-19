@@ -16,10 +16,11 @@ class Node:
         :param server_address:
         :param set_register:
         """
+
         self.server_ip = Node.parse_ip(server_address[0])
         self.server_port = Node.parse_port(server_address[1])
         self.is_register_node = set_register
-        self.client = ClientSocket(mode=self.server_ip, port=self.server_port, single_use=False)
+        self.client = ClientSocket(mode=self.server_ip, port=int(self.server_port), single_use=False)
 
         print("Server Address: ", server_address)
 
