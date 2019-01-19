@@ -34,6 +34,7 @@ class Node:
         """
         for data in self.out_buff:
             self.client.send(data)
+        self.out_buff.clear()
 
     def add_message_to_out_buff(self, message):
         """

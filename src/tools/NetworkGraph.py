@@ -109,7 +109,7 @@ class NetworkGraph:
         node = self.find_node(node_address[0], node_address[1])
         node.alive = False
 
-    def remove_node(self, node_address):
+    def remove_node(self, node_address):  # TODO
         node = self.find_node(node_address[0], node_address[1])
         node.alive = False
         if node.right:

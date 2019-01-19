@@ -62,7 +62,8 @@ class Peer:
 
         :return:
         """
-        pass
+        self.ui.daemon = True
+        self.ui.start()
 
     def handle_user_interface_buffer(self):
         """
@@ -77,7 +78,14 @@ class Peer:
             2. Don't forget to clear our UserInterface buffer.
         :return:
         """
-        pass
+
+        if self.ui.buffer == 'register':
+            pass
+        elif self.ui.buffer == 'advertise':
+            pass
+        elif self.ui.buffer == 'sendMessage':
+            pass
+
 
     def run(self):
         """
@@ -97,7 +105,10 @@ class Peer:
 
         :return:
         """
-        pass
+        self.start_user_interface()
+        self.handle_user_interface_buffer()
+        time.sleep(2)
+
 
     def run_reunion_daemon(self):
         """

@@ -161,7 +161,7 @@ class Stream:
         """
         try:
             node.send_message()
-        except EOFError:
+        except IOError:
             self.remove_node(node)
 
     def send_out_buf_messages(self, only_register=False):

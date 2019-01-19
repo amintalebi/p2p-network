@@ -8,5 +8,5 @@ peer = Peer(peer_address[0],
             root_address=Stream.ROOT_ADDRESS)
 
 peer.run()
-peer.ui.run()
+
 
