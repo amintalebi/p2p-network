@@ -15,6 +15,8 @@ import threading
 
 
 class Peer:
+    ROOT_ADDRESS = ()
+
     def __init__(self, server_ip, server_port, is_root=False, root_address=None):
         """
         The Peer object constructor.
@@ -50,6 +52,7 @@ class Peer:
 
         if is_root:
             self.network_graph = NetworkGraph(GraphNode((server_ip, server_port)))
+            Peer.ROOT_ADDRESS = (server_ip, server_port)
             # TODO reunion daemon
         else:
             # TODO connect to the root of the network
@@ -294,4 +297,3 @@ class Peer:
         :return: The specified neighbour for the sender; The format is like ('192.168.001.001', '05335').
         """
         return self.network_graph.find_live_node(sender).address
-

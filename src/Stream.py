@@ -1,5 +1,5 @@
 from src.tools.simpletcp.tcpserver import TCPServer
-
+from src.Peer import Peer
 from src.tools.Node import Node
 import threading
 
@@ -17,6 +17,7 @@ class Stream:
         :param ip: 15 characters
         :param port: 5 characters
         """
+        self.nodes = dict()
 
         ip = Node.parse_ip(ip)
         port = Node.parse_port(port)
@@ -36,6 +37,12 @@ class Stream:
             self._server_in_buf.append(data)
 
         self.tcp_server = TCPServer(mode=ip, port=port, read_callback=callback)
+
+        server_thread = threading.Thread(target=self.tcp_server.run())
+        server_thread.run()
+
+        if (ip, port) != Peer.ROOT_ADDRESS:
+            self.add_node(Peer.ROOT_ADDRESS, set_register_connection=True)
 
     def get_server_address(self):
         """
@@ -65,7 +72,8 @@ class Stream:
 
         :return:
         """
-        pass
+        new_node = Node(server_address, set_register=set_register_connection)
+        self.nodes[str((new_node.server_ip, new_node.server_port))] = new_node
 
     def remove_node(self, node):
         """
@@ -79,7 +87,13 @@ class Stream:
 
         :return:
         """
-        pass
+
+        try:
+            node = self.nodes[str((node.server_ip, node.server_port))]
+            node.close()
+            self.nodes.pop(str((node.server_ip, node.server_port)))
+        except KeyError:
+            pass  # TODO
 
     def get_node_by_server(self, ip, port):
         """
@@ -95,7 +109,12 @@ class Stream:
         :return: The node that input address.
         :rtype: Node
         """
-        pass
+        try:
+            return self.nodes[str((Node.parse_ip(ip), Node.parse_port(port)))]
+        except KeyError:
+            pass # TODO
+
+        return None
 
     def add_message_to_out_buff(self, address, message):
         """
@@ -110,7 +129,12 @@ class Stream:
 
         :return:
         """
-        pass
+
+        try:
+            node = self.nodes[(Node.parse_ip(address[0]), Node.parse_port(address[1]))]
+            node.add_message_to_out_buff(message)
+        except KeyError:
+            pass  # TODO show to user
 
     def read_in_buf(self):
         """
@@ -134,7 +158,7 @@ class Stream:
 
         :return:
         """
-        pass
+        if node.client.     # TODO
 
     def send_out_buf_messages(self, only_register=False):
         """

@@ -1,9 +1,8 @@
 from src.tools.simpletcp.clientsocket import ClientSocket
 
 
-
 class Node:
-    def __init__(self, server_address, set_root=False, set_register=False):
+    def __init__(self, server_address, set_register=False):
         """
         The Node object constructor.
 
@@ -15,7 +14,6 @@ class Node:
                an exception and we should detach this Node and clear its output buffer.
 
         :param server_address:
-        :param set_root:
         :param set_register:
         """
         self.server_ip = Node.parse_ip(server_address[0])
