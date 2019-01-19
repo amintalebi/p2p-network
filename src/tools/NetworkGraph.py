@@ -116,6 +116,7 @@ class NetworkGraph:
             self.remove_node(node.right.address)
         if node.left:
             self.remove_node(node.left.address)
+        return
 
     def add_node(self, ip, port, father_address):
         """
@@ -135,7 +136,6 @@ class NetworkGraph:
 
         :return:
         """
-
         father = self.find_node(father_address[0], father_address[1])
 
         new_node = GraphNode((ip, port))
