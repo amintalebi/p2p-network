@@ -25,14 +25,12 @@ class Node:
 
         self.out_buff = []
 
-
     def send_message(self):
         """
         Final function to send buffer to the client's socket.
 
         :return:
         """
-        if self.client.c
         for data in self.out_buff:
             self.client.send(data)
 

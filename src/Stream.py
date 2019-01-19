@@ -112,7 +112,7 @@ class Stream:
         try:
             return self.nodes[str((Node.parse_ip(ip), Node.parse_port(port)))]
         except KeyError:
-            pass # TODO
+            pass  # TODO
 
         return None
 
@@ -158,7 +158,10 @@ class Stream:
 
         :return:
         """
-        if node.client.     # TODO
+        try:
+            node.send_message()
+        except EOFError:
+            self.remove_node(node)
 
     def send_out_buf_messages(self, only_register=False):
         """
@@ -166,4 +169,10 @@ class Stream:
 
         :return:
         """
-        pass
+        if only_register:
+            register_node = self.nodes[
+                str((Node.parse_ip(Peer.ROOT_ADDRESS[0]), Node.parse_port(Peer.ROOT_ADDRESS[1])))]
+            self.send_messages_to_node(register_node)
+        else:
+            for node in list(self.nodes.keys()):
+                self.send_messages_to_node(self.nodes[node])
