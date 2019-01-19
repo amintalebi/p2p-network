@@ -1,6 +1,7 @@
 from src.tools.simpletcp.clientsocket import ClientSocket
 
 
+
 class Node:
     def __init__(self, server_address, set_root=False, set_register=False):
         """
@@ -19,6 +20,7 @@ class Node:
         """
         self.server_ip = Node.parse_ip(server_address[0])
         self.server_port = Node.parse_port(server_address[1])
+        self.client = ClientSocket(mode=self.server_ip, port=self.server_port)
 
         print("Server Address: ", server_address)
 
@@ -51,7 +53,6 @@ class Node:
 
     def get_server_address(self):
         """
-
         :return: Server address in a pretty format.
         :rtype: tuple
         """

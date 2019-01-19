@@ -35,7 +35,7 @@ class Stream:
             queue.put(bytes('ACK', 'utf8'))
             self._server_in_buf.append(data)
 
-        pass
+        self.tcp_server = TCPServer(mode=ip, port=port, read_callback=callback)
 
     def get_server_address(self):
         """
@@ -43,7 +43,7 @@ class Stream:
         :return: Our TCPServer address
         :rtype: tuple
         """
-        pass
+        return self.tcp_server.ip, self.tcp_server.port
 
     def clear_in_buff(self):
         """
