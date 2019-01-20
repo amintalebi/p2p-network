@@ -415,9 +415,14 @@ class PacketFactory:
         """
 
         source_ip, source_port = source_server_address[0], source_server_address[1]
-        packet_length = len(type) + Packet.IP_SIZE + Packet.PORT_SIZE
+        if type == Packet.BODY_REQ:
+            packet_length = len(type) + Packet.IP_SIZE + Packet.PORT_SIZE
+            body = type + address[0] + address[1]
+        else:
+            packet_length = len(type) + len(Packet.BODY_ACK)
+            body = type + Packet.BODY_ACK
+
         header = '|'.join([str(Packet.VERSION), str(Packet.REGISTER), str(packet_length), source_ip, source_port])
-        body = type + address[0] + address[1]
         string_buffer = '|'.join([header, body])
         return Packet(string_buffer)
 

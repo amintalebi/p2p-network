@@ -1,3 +1,4 @@
+from src.tools.Node import Node
 from src.Stream import Stream
 from src.Packet import Packet, PacketFactory
 from src.UserInterface import UserInterface
@@ -42,17 +43,25 @@ class Peer:
         :type is_root: bool
         :type root_address: tuple
         """
+        self.address = (Node.parse_ip(server_ip), Node.parse_port(str(server_port)))
+        self.root_address = root_address
         self.stream = Stream(server_ip, server_port, root_address)
         self.packet_factory = PacketFactory()
         self.ui = UserInterface()
-        self.network_graph = None
 
-        self.reunion_daemon = threading.Thread(target=self.run_reunion_daemon)
+        self.is_root = is_root
+        self.network_graph = None
+        self.registered_peers = None
+
+        # self.reunion_daemon = threading.Thread(target=self.run_reunion_daemon)
 
         if is_root:
             self.network_graph = NetworkGraph(GraphNode((server_ip, server_port)))
+            self.registered_peers = dict()
         elif root_address is not None:
             self.stream.add_node(root_address, set_register_connection=True)
+
+        self.start_user_interface()
 
     def start_user_interface(self):
         """
@@ -78,7 +87,8 @@ class Peer:
         """
 
         if self.ui.buffer == 'register':
-            pass
+            register_packet = self.packet_factory.new_register_packet(Packet.BODY_REQ, self.address, self.address)
+            self.stream.add_message_to_out_buff(self.root_address, register_packet.get_buf())
         elif self.ui.buffer == 'advertise':
             pass
         elif self.ui.buffer == 'sendMessage':
@@ -102,9 +112,16 @@ class Peer:
 
         :return:
         """
-        self.start_user_interface()
-        self.handle_user_interface_buffer()
-        time.sleep(2)
+        # TODO warnings handling
+
+
+        while True:
+            self.handle_user_interface_buffer()
+            for message in self.stream.read_in_buf():
+                packet = self.packet_factory.parse_buffer(message)
+                self.handle_packet(packet)
+            self.stream.send_out_buf_messages()
+            time.sleep(2)
 
     def run_reunion_daemon(self):
         """
@@ -150,7 +167,6 @@ class Peer:
 
     def handle_packet(self, packet):
         """
-
         This function act as a wrapper for other handle_###_packet methods to handle the packet.
 
         Code design suggestion:
@@ -161,7 +177,24 @@ class Peer:
         :type packet Packet
 
         """
-        pass
+        packet_type = packet.get_type()
+        try:
+            assert packet.get_version() == Packet.VERSION
+            assert packet_type in [Packet.REGISTER, Packet.ADVERTISE, Packet.JOIN, Packet.MESSAGE, Packet.REUNION]
+            assert packet.get_length() == len(packet.get_body())
+        except AssertionError:
+            pass  # TODO handle messages
+
+        if packet_type == Packet.REGISTER:
+            self.__handle_register_packet(packet)
+        elif packet_type == Packet.ADVERTISE:
+            self.__handle_reunion_packet(packet)
+        elif packet_type == Packet.JOIN:
+            self.__handle_join_packet(packet)
+        elif packet_type == Packet.MESSAGE:
+            self.__handle_message_packet(packet)
+        elif packet_type == Packet.REUNION:
+            self.__handle_reunion_packet(packet)
 
     def __check_registered(self, source_address):
         """
@@ -172,7 +205,10 @@ class Peer:
 
         :return:
         """
-        pass
+        if self.registered_peers is not None:
+            if str((Node.parse_ip(source_address[0]), Node.parse_port(source_address[1]))) in self.registered_peers:
+                return True
+            return False
 
     def __handle_advertise_packet(self, packet):
         """
@@ -220,7 +256,22 @@ class Peer:
         :type packet Packet
         :return:
         """
-        pass
+        if not self.is_root:
+            return
+
+        body_str = packet.get_body()
+        body_type = body_str[:3]
+        if body_type == Packet.BODY_REQ and len(body_str) == 23:
+            source_ip = body_str[3:18]
+            source_port = body_str[18:23]
+            source_address = (source_ip, source_port)
+            if self.__check_registered(source_address):
+                return
+
+            self.stream.add_node(source_address, set_register_connection=True)
+            response_packet = self.packet_factory.new_register_packet(Packet.BODY_RES, source_address)
+            message = response_packet.get_buf()
+            self.stream.add_message_to_out_buff(source_address, message)
 
     def __check_neighbour(self, address):
         """
