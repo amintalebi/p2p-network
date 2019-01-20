@@ -1,5 +1,3 @@
-from sys import stderr
-
 from src.tools.simpletcp.clientsocket import ClientSocket
 
 
@@ -28,7 +26,7 @@ class Node:
             self.client = ClientSocket(mode=self.server_ip, port=int(self.server_port), single_use=False)
         except Exception:
             self.out_buff.clear()
-            raise ConnectionError('Client socket cannot be initialized.')
+            raise ConnectionError('Client socket cannot be initialized')
 
         print("Server Address: ", server_address)
 
@@ -39,10 +37,8 @@ class Node:
         :return:
         """
         for data in self.out_buff:
-
             self.client.send(data)
-        if len(self.out_buff):
-            print(self.out_buff)
+
         self.out_buff.clear()
 
     def add_message_to_out_buff(self, message):
