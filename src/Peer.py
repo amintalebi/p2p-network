@@ -89,6 +89,7 @@ class Peer:
         if self.ui.buffer == 'register':
             register_packet = self.packet_factory.new_register_packet(Packet.BODY_REQ, self.address, self.address)
             self.stream.add_message_to_out_buff(self.root_address, register_packet.get_buf())
+            print('register packet created')
         elif self.ui.buffer == 'advertise':
             pass
         elif self.ui.buffer == 'sendMessage':
@@ -120,6 +121,7 @@ class Peer:
             for message in self.stream.read_in_buf():
                 packet = self.packet_factory.parse_buffer(message)
                 self.handle_packet(packet)
+                print(message)
             self.stream.send_out_buf_messages()
             time.sleep(2)
 
@@ -178,6 +180,7 @@ class Peer:
 
         """
         packet_type = packet.get_type()
+        print(packet_type)
         try:
             assert packet.get_version() == Packet.VERSION
             assert packet_type in [Packet.REGISTER, Packet.ADVERTISE, Packet.JOIN, Packet.MESSAGE, Packet.REUNION]
@@ -186,6 +189,7 @@ class Peer:
             pass  # TODO handle messages
 
         if packet_type == Packet.REGISTER:
+            print('register packet received')
             self.__handle_register_packet(packet)
         elif packet_type == Packet.ADVERTISE:
             self.__handle_reunion_packet(packet)
@@ -266,8 +270,9 @@ class Peer:
             source_port = body_str[18:23]
             source_address = (source_ip, source_port)
             if self.__check_registered(source_address):
+                print('peer is already been registered!')
                 return
-
+            self.registered_peers[str(source_address)] = True
             self.stream.add_node(source_address, set_register_connection=True)
             response_packet = self.packet_factory.new_register_packet(Packet.BODY_RES, source_address)
             message = response_packet.get_buf()

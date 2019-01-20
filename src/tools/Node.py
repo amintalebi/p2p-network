@@ -20,6 +20,8 @@ class Node:
         self.server_ip = Node.parse_ip(server_address[0])
         self.server_port = Node.parse_port(server_address[1])
         self.is_register_node = set_register
+        self.out_buff = []
+
         try:
             self.client = ClientSocket(mode=self.server_ip, port=int(self.server_port), single_use=False)
         except Exception:
@@ -28,7 +30,7 @@ class Node:
 
         print("Server Address: ", server_address)
 
-        self.out_buff = []
+
 
     def send_message(self):
         """
