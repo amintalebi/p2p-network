@@ -268,6 +268,8 @@ class Peer:
                                                                        Node.parse_address(neighbour_address))
             message = response_packet.get_buf()
             self.stream.add_message_to_out_buff(packet.get_source_server_address(), message)
+            self.network_graph.add_node(packet.get_source_server_ip(), int(packet.get_source_server_port()),
+                                        neighbour_address)
         else:
             if len(body_str) != 23 or body_str[:3] != Packet.BODY_RES:
                 return
@@ -378,6 +380,11 @@ class Peer:
 
         :return:
         """
+        body_str = packet.get_body()
+        if len(body_str) != 4 or body_str != Packet.BODY_JOIN:
+            return
+        source_address = packet.get_source_server_address()
+        self.stream.add_node(source_address)
 
     def __get_neighbour(self, sender):
         """
