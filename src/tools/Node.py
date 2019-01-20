@@ -10,7 +10,7 @@ class Node:
         Every node has a ClientSocket that should bind to the Node TCPServer address.
 
         Warnings:
-            1. Insert an exception handler when initializing the ClientSocket; when a socket closed here we will face to
+            1. Insert an exception handler when initializing the ClientSocket; when a socket closed here we will face
                an exception and we should detach this Node and clear its output buffer.
 
         :param server_address:
@@ -20,7 +20,11 @@ class Node:
         self.server_ip = Node.parse_ip(server_address[0])
         self.server_port = Node.parse_port(server_address[1])
         self.is_register_node = set_register
-        self.client = ClientSocket(mode=self.server_ip, port=int(self.server_port), single_use=False)
+        try:
+            self.client = ClientSocket(mode=self.server_ip, port=int(self.server_port), single_use=False)
+        except Exception:
+            self.out_buff.clear()
+            raise ConnectionError('Client socket cannot be initialized.')
 
         print("Server Address: ", server_address)
 

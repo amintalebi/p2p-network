@@ -4,9 +4,7 @@ import threading
 
 
 class Stream:
-    ROOT_ADDRESS = ()
-
-    def __init__(self, ip, port):
+    def __init__(self, ip, port, root_address=None):
         """
         The Stream object constructor.
 
@@ -18,6 +16,7 @@ class Stream:
         :param port: 5 characters
         """
         self.nodes = dict()
+        self.root_address = root_address
 
         ip = Node.parse_ip(ip)
         port = Node.parse_port(port)
@@ -40,9 +39,6 @@ class Stream:
 
         server_thread = threading.Thread(target=self.tcp_server.run)
         server_thread.start()
-
-        if (ip, port) != self.ROOT_ADDRESS:
-            self.add_node(self.ROOT_ADDRESS, set_register_connection=True)
 
     def get_server_address(self):
         """
@@ -172,10 +168,8 @@ class Stream:
         """
         if only_register:
             register_node = self.nodes[
-                str((Node.parse_ip(self.ROOT_ADDRESS[0]), Node.parse_port(self.ROOT_ADDRESS[1])))]
+                str((Node.parse_ip(self.root_address[0]), Node.parse_port(self.root_address[1])))]
             self.send_messages_to_node(register_node)
         else:
-            for node in list(self.nodes.keys()):
-                self.send_messages_to_node(self.nodes[node])
-
-
+            for node in list(self.nodes.values()):
+                self.send_messages_to_node(node)

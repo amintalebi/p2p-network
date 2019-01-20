@@ -42,19 +42,17 @@ class Peer:
         :type is_root: bool
         :type root_address: tuple
         """
-        self.stream = Stream(server_ip, server_port)
+        self.stream = Stream(server_ip, server_port, root_address)
         self.packet_factory = PacketFactory()
         self.ui = UserInterface()
         self.network_graph = None
-        self.neighbour = None
+
+        self.reunion_daemon = threading.Thread(target=self.run_reunion_daemon)
 
         if is_root:
             self.network_graph = NetworkGraph(GraphNode((server_ip, server_port)))
-
-            # TODO reunion daemon
-        else:
-            # TODO connect to the root of the network
-            self.neighbour = self.__get_neighbour((server_ip, server_port))
+        elif root_address is not None:
+            self.stream.add_node(root_address, set_register_connection=True)
 
     def start_user_interface(self):
         """
@@ -86,7 +84,6 @@ class Peer:
         elif self.ui.buffer == 'sendMessage':
             pass
 
-
     def run(self):
         """
         The main loop of the program.
@@ -108,7 +105,6 @@ class Peer:
         self.start_user_interface()
         self.handle_user_interface_buffer()
         time.sleep(2)
-
 
     def run_reunion_daemon(self):
         """
