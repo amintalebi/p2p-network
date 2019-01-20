@@ -343,7 +343,16 @@ class Peer:
 
         :return:
         """
-        pass
+        if self.stream.get_node_by_server(packet.get_source_server_ip(),
+                                          packet.get_source_server_port()) not in self.stream.nodes.values():
+            return
+        body_str = packet.get_body()
+        message_packet = self.packet_factory.new_message_packet(body_str, packet.get_source_server_address())
+        packet_buff = message_packet.get_buf()
+        for node in self.stream.nodes:
+            if node.is_register_node or node.get_server_address() == packet.get_source_server_address():
+                continue
+            self.stream.add_message_to_out_buff(node.get_server_address(), packet_buff)
 
     def __handle_reunion_packet(self, packet):
         """
