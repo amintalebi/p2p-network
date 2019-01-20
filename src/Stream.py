@@ -16,6 +16,8 @@ class Stream:
         :param port: 5 characters
         """
         self.nodes = dict()
+        self.register_node = None
+
         self.root_address = root_address
 
         ip = Node.parse_ip(ip)
@@ -69,6 +71,10 @@ class Stream:
         :return:
         """
 
+        if set_register_connection:
+            self.register_node = Node(server_address, set_register=set_register_connection)
+            return
+
         new_node = Node(server_address, set_register=set_register_connection)
         self.nodes[str((new_node.server_ip, new_node.server_port))] = new_node
 
@@ -84,13 +90,17 @@ class Stream:
 
         :return:
         """
-
         try:
+            if node.is_register_node:
+                self.register_node.close()
+                self.register_node = None
+                return
+
             node = self.nodes[str((node.server_ip, node.server_port))]
             node.close()
             self.nodes.pop(str((node.server_ip, node.server_port)))
-        except KeyError:
-            pass  # TODO
+        except KeyError or IOError:
+            print('could not remover node')
 
     def get_node_by_server(self, ip, port):
         """
@@ -109,7 +119,7 @@ class Stream:
         try:
             return self.nodes[str((Node.parse_ip(ip), Node.parse_port(port)))]
         except KeyError:
-            pass  # TODO
+            print('get node by server, could not find node')
 
         return None
 
@@ -128,12 +138,10 @@ class Stream:
         """
 
         try:
-            print(self.nodes)
             node = self.nodes[str((Node.parse_ip(address[0]), Node.parse_port(address[1])))]
             node.add_message_to_out_buff(message)
         except KeyError:
-            print('No node exists.')
-            pass  # TODO show to user
+            print('add message to out buff, could not find node')
 
     def read_in_buf(self):
         """
@@ -160,6 +168,7 @@ class Stream:
         try:
             node.send_message()
         except IOError:
+            print('send message to node, could not send message')
             self.remove_node(node)
 
     def send_out_buf_messages(self, only_register=False):
@@ -169,9 +178,8 @@ class Stream:
         :return:
         """
         if only_register:
-            register_node = self.nodes[
-                str((Node.parse_ip(self.root_address[0]), Node.parse_port(self.root_address[1])))]
-            self.send_messages_to_node(register_node)
-        else:
-            for node in list(self.nodes.values()):
-                self.send_messages_to_node(node)
+            self.send_messages_to_node(self.register_node)
+            return
+
+        for node in list(self.nodes.values()):
+            self.send_messages_to_node(node)
