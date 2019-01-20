@@ -39,7 +39,6 @@ class Node:
         :return:
         """
         for data in self.out_buff:
-
             self.client.send(data)
         if len(self.out_buff):
             print(self.out_buff)
@@ -91,3 +90,14 @@ class Node:
         :rtype: str
         """
         return str(int(port)).zfill(5)
+
+    @staticmethod
+    def parse_address(address):
+        """
+        :param address: Input Address
+        :type address: tuple ('192.168.1.1', 421)
+
+        :return: Formatted Address
+        :rtype: tuple ('192.168.001.001', '00421')
+        """
+        return Node.parse_ip(address[0]), Node.parse_port(str(address[1]))

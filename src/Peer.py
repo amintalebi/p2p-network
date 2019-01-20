@@ -50,10 +50,11 @@ class Peer:
         self.ui = UserInterface()
 
         self.is_root = is_root
+        self.parent_address = Node
         self.network_graph = None
         self.registered_peers = None
 
-        # self.reunion_daemon = threading.Thread(target=self.run_reunion_daemon)
+        self.reunion_daemon = threading.Thread(target=self.run_reunion_daemon)
 
         if is_root:
             self.network_graph = NetworkGraph(GraphNode((server_ip, server_port)))
@@ -88,16 +89,20 @@ class Peer:
         """
 
         for cmd in self.ui.buffer:
+            if cmd == 'sendMessage':
+                # TODO get message in addition to command
+                pass
+            if self.is_root:
+                continue
             if cmd == 'register':
                 register_packet = self.packet_factory.new_register_packet(Packet.BODY_REQ, self.address, self.address)
                 print(register_packet.get_buf())
                 self.stream.add_message_to_out_buff(self.root_address, register_packet.get_buf())
                 print('register packet created')
             elif cmd == 'advertise':
-                pass
-            elif cmd == 'sendMessage':
-                # TODO get message in addition to command
-                pass
+                advertise_packet = self.packet_factory.new_advertise_packet(Packet.BODY_REQ, self.address)
+                print(advertise_packet.get_buf())
+                self.stream.add_message_to_out_buff(self.root_address, advertise_packet.get_buf())
         self.ui.buffer.clear()
 
     def run(self):
@@ -244,13 +249,37 @@ class Peer:
                sub-tree.
             4. When an Advertise Response packet arrived update our Peer parent for sending Reunion Packets.
 
-        :param packet: Arrived register packet
+        :param packet: Arrived advertise packet
 
         :type packet Packet
 
         :return:
         """
-        pass
+        body_str = packet.get_body()
+        if self.is_root:
+            if len(body_str) != 3 or body_str != Packet.BODY_REQ:
+                return
+            if not self.__check_registered(packet.get_source_server_address()):
+                print('Peer that has sent request advertise has not registered before.')
+                return
+            neighbour_address = self.__get_neighbour(packet.get_source_server_address())
+            response_packet = self.packet_factory.new_advertise_packet(Packet.BODY_RES,
+                                                                       packet.get_source_server_address(),
+                                                                       Node.parse_address(neighbour_address))
+            message = response_packet.get_buf()
+            self.stream.add_message_to_out_buff(packet.get_source_server_address(), message)
+        else:
+            if len(body_str) != 23 or body_str[:3] != Packet.BODY_RES:
+                return
+            parent_ip = body_str[3:18]
+            parent_port = body_str[18:23]
+            self.parent_address = (parent_ip, parent_port)
+            self.stream.add_node(self.parent_address)
+            join_packet = self.packet_factory.new_join_packet(self.address)
+            message = join_packet.get_buf()
+            self.stream.add_message_to_out_buff(self.parent_address, message)
+
+            self.reunion_daemon.start()
 
     def __handle_register_packet(self, packet):
         """
@@ -267,12 +296,12 @@ class Peer:
         :type packet Packet
         :return:
         """
-        if not self.is_root:
+        body_str = packet.get_body()
+        if not self.is_root or len(body_str) != 23:
             return
 
-        body_str = packet.get_body()
         body_type = body_str[:3]
-        if body_type == Packet.BODY_REQ and len(body_str) == 23:
+        if body_type == Packet.BODY_REQ:
             source_ip = body_str[3:18]
             source_port = body_str[18:23]
             source_address = (source_ip, source_port)
@@ -287,7 +316,7 @@ class Peer:
 
     def __check_neighbour(self, address):
         """
-        It checks is the address in our neighbours array or not.
+        It checks if the address in our neighbours array or not.
 
         :param address: Unknown address
 
@@ -345,13 +374,10 @@ class Peer:
         In reality, there is a security level that forbids joining every node to our network.
 
         :param packet: Arrived register packet.
-
-
         :type packet Packet
 
         :return:
         """
-        pass
 
     def __get_neighbour(self, sender):
         """

@@ -82,6 +82,7 @@ class NetworkGraph:
                 to_visit.append(current.left)
             if current.right:
                 to_visit.append(current.right)
+        return None
 
     def find_node(self, ip, port):
         address = (ip, port)
