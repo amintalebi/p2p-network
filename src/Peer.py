@@ -62,6 +62,7 @@ class Peer:
             self.stream.add_node(root_address, set_register_connection=True)
 
         self.start_user_interface()
+        print('Peer initialized.')
 
     def start_user_interface(self):
         """
@@ -69,13 +70,13 @@ class Peer:
 
         :return:
         """
-        self.ui.daemon = True
+
         self.ui.start()
 
     def handle_user_interface_buffer(self):
         """
         In every interval, we should parse user command that buffered from our UserInterface.
-        All of the valid commands are listed below:
+        All of the valid commands a re listed below:
             1. Register:  With this command, the client send a Register Request packet to the root of the network.
             2. Advertise: Send an Advertise Request to the root of the network for finding first hope.
             3. SendMessage: The following string will be added to a new Message packet and broadcast through the network.
@@ -86,14 +87,18 @@ class Peer:
         :return:
         """
 
-        if self.ui.buffer == 'register':
-            register_packet = self.packet_factory.new_register_packet(Packet.BODY_REQ, self.address, self.address)
-            self.stream.add_message_to_out_buff(self.root_address, register_packet.get_buf())
-            print('register packet created')
-        elif self.ui.buffer == 'advertise':
-            pass
-        elif self.ui.buffer == 'sendMessage':
-            pass
+        for cmd in self.ui.buffer:
+            if cmd == 'register':
+                register_packet = self.packet_factory.new_register_packet(Packet.BODY_REQ, self.address, self.address)
+                print(register_packet.get_buf())
+                self.stream.add_message_to_out_buff(self.root_address, register_packet.get_buf())
+                print('register packet created')
+            elif cmd == 'advertise':
+                pass
+            elif cmd == 'sendMessage':
+                # TODO get message in addition to command
+                pass
+        self.ui.buffer.clear()
 
     def run(self):
         """
@@ -115,13 +120,15 @@ class Peer:
         """
         # TODO warnings handling
 
-
         while True:
             self.handle_user_interface_buffer()
-            for message in self.stream.read_in_buf():
+            stream_in_buff_snapshot = self.stream.read_in_buf()
+            snapshot_size = len(stream_in_buff_snapshot)
+            for message in stream_in_buff_snapshot:
                 packet = self.packet_factory.parse_buffer(message)
                 self.handle_packet(packet)
                 print(message)
+            self.stream.clear_in_buff(snapshot_size)
             self.stream.send_out_buf_messages()
             time.sleep(2)
 

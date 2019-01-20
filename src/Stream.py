@@ -48,13 +48,13 @@ class Stream:
         """
         return self.tcp_server.ip, self.tcp_server.port
 
-    def clear_in_buff(self):
+    def clear_in_buff(self, snapshot_size):
         """
         Discard any data in TCPServer input buffer.
 
         :return:
         """
-        self._server_in_buf.clear()
+        self._server_in_buf = self._server_in_buf[snapshot_size:]
 
     def add_node(self, server_address, set_register_connection=False):
         """
@@ -128,9 +128,11 @@ class Stream:
         """
 
         try:
-            node = self.nodes[(Node.parse_ip(address[0]), Node.parse_port(address[1]))]
+            print(self.nodes)
+            node = self.nodes[str((Node.parse_ip(address[0]), Node.parse_port(address[1])))]
             node.add_message_to_out_buff(message)
         except KeyError:
+            print('No node exists.')
             pass  # TODO show to user
 
     def read_in_buf(self):

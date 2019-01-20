@@ -264,8 +264,10 @@ class Packet:
 
         ip_part1_str, ip_part2_str, ip_part3_str, ip_part4_str = self.source_server_ip.split('.')
 
-        return pack('!2HL4HL' + str(len(self.body)) + 'c', self.version, self.type, self.length, int(ip_part1_str),
-                    int(ip_part2_str), int(ip_part3_str), int(ip_part4_str), int(self.source_server_port), self.body)
+        header_bytearray = pack('!2HL4HL', self.version, self.type, self.length, int(ip_part1_str),
+                                int(ip_part2_str), int(ip_part3_str), int(ip_part4_str), int(self.source_server_port))
+        body_bytearray = bytearray(self.get_body(), 'utf-8')
+        return header_bytearray + body_bytearray
 
     def get_source_server_ip(self):
         """

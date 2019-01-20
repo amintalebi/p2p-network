@@ -1,7 +1,7 @@
 from src.Peer import Peer
 from src.Stream import Stream
 
-root_address = ('127.0.0.1', 3434)
+root_address = ('127.0.0.2', 3434)
 
 peer_address = ("127.0.0.3", 8000)
 peer = Peer(peer_address[0],

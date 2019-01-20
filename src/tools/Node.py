@@ -1,3 +1,5 @@
+from sys import stderr
+
 from src.tools.simpletcp.clientsocket import ClientSocket
 
 
@@ -30,8 +32,6 @@ class Node:
 
         print("Server Address: ", server_address)
 
-
-
     def send_message(self):
         """
         Final function to send buffer to the client's socket.
@@ -39,7 +39,10 @@ class Node:
         :return:
         """
         for data in self.out_buff:
+
             self.client.send(data)
+        if len(self.out_buff):
+            print(self.out_buff)
         self.out_buff.clear()
 
     def add_message_to_out_buff(self, message):
