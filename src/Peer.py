@@ -44,16 +44,19 @@ class Peer:
         :type root_address: tuple
         """
         self.address = (Node.parse_ip(server_ip), Node.parse_port(str(server_port)))
-        self.root_address = root_address
+        self.root_address = None if root_address is None else Node.parse_address(root_address)
         self.stream = Stream(server_ip, server_port, root_address)
         self.packet_factory = PacketFactory()
         self.ui = UserInterface()
 
         self.is_root = is_root
-        self.parent_address = Node
+        self.parent_address = None
+        self.children = []
+
         self.network_graph = None
         self.registered_peers = None
 
+        self.waiting_for_hello_back = False
         self.reunion_daemon = threading.Thread(target=self.run_reunion_daemon)
 
         if is_root:
@@ -87,23 +90,31 @@ class Peer:
             2. Don't forget to clear our UserInterface buffer.
         :return:
         """
-
-        for cmd in self.ui.buffer:
+        i = 0
+        ui_buffer_snapshot_size = len(self.ui.buffer)
+        while i < ui_buffer_snapshot_size:
+            cmd = self.ui.buffer[i]
             if cmd == 'sendMessage':
-                # TODO get message in addition to command
-                pass
+                msg = self.ui.buffer[i + 1]
+                broadcast_packet = self.packet_factory.new_message_packet(msg, self.address)
+                self.send_broadcast_packet(broadcast_packet)
+                i += 2
+
             if self.is_root:
                 continue
             if cmd == 'register':
                 register_packet = self.packet_factory.new_register_packet(Packet.BODY_REQ, self.address, self.address)
                 print(register_packet.get_buf())
-                self.stream.add_message_to_out_buff(self.root_address, register_packet.get_buf())
-                print('register packet created')
+                self.stream.add_message_to_out_buff(self.root_address, register_packet.get_buf(), is_register_node=True)
+                # print('register packet created')
             elif cmd == 'advertise':
                 advertise_packet = self.packet_factory.new_advertise_packet(Packet.BODY_REQ, self.address)
-                print(advertise_packet.get_buf())
-                self.stream.add_message_to_out_buff(self.root_address, advertise_packet.get_buf())
-        self.ui.buffer.clear()
+                print('sending', advertise_packet.get_buf())
+                self.stream.add_message_to_out_buff(self.root_address, advertise_packet.get_buf(),
+                                                    is_register_node=True)
+            i += 1
+
+        self.ui.buffer = self.ui.buffer[ui_buffer_snapshot_size:]
 
     def run(self):
         """
@@ -129,10 +140,13 @@ class Peer:
             self.handle_user_interface_buffer()
             stream_in_buff_snapshot = self.stream.read_in_buf()
             snapshot_size = len(stream_in_buff_snapshot)
+            if snapshot_size != 0:
+                print(stream_in_buff_snapshot)
             for message in stream_in_buff_snapshot:
                 packet = self.packet_factory.parse_buffer(message)
+                # print('packet:', packet.get_buf())
                 self.handle_packet(packet)
-                print(message)
+
             self.stream.clear_in_buff(snapshot_size)
             self.stream.send_out_buf_messages()
             time.sleep(2)
@@ -177,7 +191,12 @@ class Peer:
 
         :return:
         """
-        pass
+
+        print('Sending new broadcast message: ', broadcast_packet.get_body())
+        for child in self.children:
+            self.stream.add_message_to_out_buff(child, broadcast_packet.get_buf())
+        if not self.is_root:
+            self.stream.add_message_to_out_buff(self.parent_address, broadcast_packet.get_buf())
 
     def handle_packet(self, packet):
         """
@@ -192,25 +211,35 @@ class Peer:
 
         """
         packet_type = packet.get_type()
-        print(packet_type)
-        try:
-            assert packet.get_version() == Packet.VERSION
-            assert packet_type in [Packet.REGISTER, Packet.ADVERTISE, Packet.JOIN, Packet.MESSAGE, Packet.REUNION]
-            assert packet.get_length() == len(packet.get_body())
-        except AssertionError:
-            pass  # TODO handle messages
+        if packet.get_version() != Packet.VERSION:
+            print('Error in packet: incorrect version')
+            return
+        if packet_type not in [Packet.REGISTER, Packet.ADVERTISE, Packet.JOIN, Packet.MESSAGE, Packet.REUNION]:
+            print('Error in packet: Unknown type')
+            return
+        if packet.get_length() != len(packet.get_body()):
+            print('Error in packet: inconsistent body length')
+            print('body length in header:', packet.get_length())
+            print('real body length:', len(packet.get_body()))
+            return
 
         if packet_type == Packet.REGISTER:
             print('register packet received')
             self.__handle_register_packet(packet)
         elif packet_type == Packet.ADVERTISE:
-            self.__handle_reunion_packet(packet)
+            print('advertise packet received')
+            self.__handle_advertise_packet(packet)
         elif packet_type == Packet.JOIN:
+            print('join packet received')
             self.__handle_join_packet(packet)
         elif packet_type == Packet.MESSAGE:
+            print('message packet received')
             self.__handle_message_packet(packet)
         elif packet_type == Packet.REUNION:
+            print('reunion packet received')
             self.__handle_reunion_packet(packet)
+        else:
+            print('unknown packet type')
 
     def __check_registered(self, source_address):
         """
@@ -263,11 +292,12 @@ class Peer:
                 print('Peer that has sent request advertise has not registered before.')
                 return
             neighbour_address = self.__get_neighbour(packet.get_source_server_address())
+            print('neighbour for', packet.get_source_server_address(), 'is', neighbour_address)
             response_packet = self.packet_factory.new_advertise_packet(Packet.BODY_RES,
                                                                        packet.get_source_server_address(),
                                                                        Node.parse_address(neighbour_address))
             message = response_packet.get_buf()
-            self.stream.add_message_to_out_buff(packet.get_source_server_address(), message)
+            self.stream.add_message_to_out_buff(packet.get_source_server_address(), message, is_register_node=True)
             self.network_graph.add_node(packet.get_source_server_ip(), int(packet.get_source_server_port()),
                                         neighbour_address)
         else:
@@ -298,9 +328,12 @@ class Peer:
         :type packet Packet
         :return:
         """
-        body_str = packet.get_body()
-        if not self.is_root or len(body_str) != 23:
+        if not self.is_root:
             return
+
+        body_str = packet.get_body()
+        if len(body_str) != 23:
+            print('register request packet length is not 23')
 
         body_type = body_str[:3]
         if body_type == Packet.BODY_REQ:
@@ -314,7 +347,10 @@ class Peer:
             self.stream.add_node(source_address, set_register_connection=True)
             response_packet = self.packet_factory.new_register_packet(Packet.BODY_RES, source_address)
             message = response_packet.get_buf()
-            self.stream.add_message_to_out_buff(source_address, message)
+            self.stream.add_message_to_out_buff(source_address, message, is_register_node=True)
+            print('registered peers', self.registered_peers)
+        else:
+            print('register body type is not REQ')
 
     def __check_neighbour(self, address):
         """
@@ -327,7 +363,7 @@ class Peer:
         :return: Whether is address in our neighbours or not.
         :rtype: bool
         """
-        pass
+        return address == self.parent_address or address in self.children
 
     def __handle_message_packet(self, packet):
         """
@@ -342,17 +378,23 @@ class Peer:
         :type packet Packet
 
         :return:
+
         """
+
+        if not self.__check_neighbour(packet.get_source_server_address()):
+            print('received message from unknown source, not found in neighbours')
+            return
+
         if self.stream.get_node_by_server(packet.get_source_server_ip(),
                                           packet.get_source_server_port()) not in self.stream.nodes.values():
+            print('source not found in stream nodes')
             return
-        body_str = packet.get_body()
-        message_packet = self.packet_factory.new_message_packet(body_str, packet.get_source_server_address())
-        packet_buff = message_packet.get_buf()
-        for node in self.stream.nodes:
-            if node.is_register_node or node.get_server_address() == packet.get_source_server_address():
-                continue
-            self.stream.add_message_to_out_buff(node.get_server_address(), packet_buff)
+        print('New message received from', packet.get_source_server_address(), ':', packet.get_body())
+        for child in self.children:
+            if child != packet.get_source_server_address():
+                self.stream.add_message_to_out_buff(child, packet.get_buf())
+        if not self.is_root and self.parent_address != packet.get_source_server_address():
+                self.stream.add_message_to_out_buff(self.parent_address, packet.get_buf())
 
     def __handle_reunion_packet(self, packet):
         """
@@ -377,7 +419,48 @@ class Peer:
         :param packet: Arrived reunion packet
         :return:
         """
-        pass
+        body_str = packet.get_body()
+        num_of_entries = int(body_str[3:5])
+
+        if num_of_entries != len(body_str[5:]) // 20:
+            return
+
+        path_peers_str = body_str[5:]
+        path_peers = []
+
+        for i in range(len(path_peers_str), 20):
+            ip = path_peers_str[i:i + 15]
+            port = path_peers_str[i + 15:i + 20]
+            path_peers.append((ip, port))
+
+        if self.is_root:
+            if body_str[0:3] != Packet.BODY_REQ:
+                return
+
+            path_peers.reverse()
+            hello_back_packet = self.packet_factory.new_reunion_packet(Packet.BODY_RES, self.address, path_peers)
+            message = hello_back_packet.get_buf()
+            self.stream.add_message_to_out_buff(path_peers[0], message)
+        else:
+            if body_str[0:3] == Packet.BODY_REQ:
+                path_peers.append(self.address)
+                hello_packet = self.packet_factory.new_reunion_packet(Packet.BODY_REQ,
+                                                                      packet.get_source_server_address(), path_peers)
+                message = hello_packet.get_buf()
+                self.stream.add_message_to_out_buff(self.parent_address, message)
+            elif body_str[0:3] == Packet.BODY_RES:
+                if path_peers[0] != self.address:
+                    return
+                if len(path_peers) == 1 and self.waiting_for_hello_back:
+                    self.waiting_for_hello_back = False
+                    return
+
+                path_peers = path_peers[1:]
+                hello_back_packet = self.packet_factory.new_reunion_packet(Packet.BODY_RES,
+                                                                           packet.get_source_server_address(),
+                                                                           path_peers)
+                message = hello_back_packet.get_buf()
+                self.stream.add_message_to_out_buff(path_peers[0], message)
 
     def __handle_join_packet(self, packet):
         """
@@ -394,6 +477,9 @@ class Peer:
             return
         source_address = packet.get_source_server_address()
         self.stream.add_node(source_address)
+        self.children.append(source_address)
+        if len(self.children) > 2:
+            raise Exception('protection forgotten. excessive child!')
 
     def __get_neighbour(self, sender):
         """

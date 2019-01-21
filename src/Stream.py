@@ -16,12 +16,14 @@ class Stream:
         :param port: 5 characters
         """
         self.nodes = dict()
+        self.root_register_nodes = dict()
         self.register_node = None
-
         self.root_address = root_address
 
         ip = Node.parse_ip(ip)
         port = Node.parse_port(port)
+
+        self.is_root = True if root_address is None else False
 
         self._server_in_buf = []
 
@@ -71,11 +73,16 @@ class Stream:
         :return:
         """
 
+        new_node = Node(server_address, set_register=set_register_connection)
+
         if set_register_connection:
-            self.register_node = Node(server_address, set_register=set_register_connection)
+            if self.is_root:
+                self.root_register_nodes[str(new_node.get_server_address())] = new_node
+            else:
+                print('register node set')
+                self.register_node = new_node
             return
 
-        new_node = Node(server_address, set_register=set_register_connection)
         self.nodes[str((new_node.server_ip, new_node.server_port))] = new_node
 
     def remove_node(self, node):
@@ -123,11 +130,12 @@ class Stream:
 
         return None
 
-    def add_message_to_out_buff(self, address, message):
+    def add_message_to_out_buff(self, address, message, is_register_node=False):
         """
         In this function, we will add the message to the output buffer of the node that has the input address.
         Later we should use send_out_buf_messages to send these buffers into their sockets.
 
+        :param is_register_node:
         :param address: Node address that we want to send the message
         :param message: Message we want to send
 
@@ -137,11 +145,17 @@ class Stream:
         :return:
         """
 
-        try:
+        if is_register_node:
+            if self.is_root:
+                node = self.root_register_nodes[str(address)]
+                node.add_message_to_out_buff(message)
+            else:
+                self.register_node.add_message_to_out_buff(message)
+        else:
             node = self.nodes[str((Node.parse_ip(address[0]), Node.parse_port(address[1])))]
             node.add_message_to_out_buff(message)
-        except KeyError:
-            print('add message to out buff, could not find node')
+
+        # print('message added to out buff successfully')
 
     def read_in_buf(self):
         """
@@ -183,3 +197,10 @@ class Stream:
 
         for node in list(self.nodes.values()):
             self.send_messages_to_node(node)
+
+        for node in list(self.root_register_nodes.values()):
+            self.send_messages_to_node(node)
+
+        if self.register_node is not None:
+            # print('register node message sent')
+            self.send_messages_to_node(self.register_node)

@@ -12,4 +12,6 @@ class UserInterface(threading.Thread):
         """
         while True:
             message = input("Write your command:\n")
-            self.buffer.append(message)
+            message = message.split(' ')
+            for msg in message:
+                self.buffer.append(msg)

@@ -310,8 +310,8 @@ class PacketFactory:
         :rtype: Packet
 
         """
-        raw_header, raw_body = unpack_from(str(Packet.HEADER_SIZE) + 's' + str(len(buffer) - Packet.HEADER_SIZE) + 's',
-                                           buffer, offset=0)
+        raw_header, raw_body = unpack('!' + str(Packet.HEADER_SIZE) + 's' + str(len(buffer) - Packet.HEADER_SIZE) + 's',
+                                      buffer)
         version, packet_type, length, raw_source_server_ip, source_server_port = unpack('!2HL8sL', raw_header)
         ip_part1, ip_part2, ip_part3, ip_part4 = unpack('!4H', raw_source_server_ip)
         source_server_ip = '.'.join([str(ip_part1).zfill(3), str(ip_part2).zfill(3), str(ip_part3).zfill(3),
@@ -444,7 +444,7 @@ class PacketFactory:
         """
 
         source_ip, source_port = source_server_address[0], source_server_address[1]
-        packet_length = len(Packet.BODY_JOIN)
+        packet_length = len(message)
         header = '|'.join([str(Packet.VERSION), str(Packet.MESSAGE), str(packet_length), source_ip, source_port])
         body = message
         string_buffer = '|'.join([header, body])

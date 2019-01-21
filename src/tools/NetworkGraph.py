@@ -28,13 +28,25 @@ class GraphNode:
         self.alive = False
 
     def add_child(self, child):
-        if self.right is None:
-            self.right = child
-        else:
+        if self.left is None:
             self.left = child
+        else:
+            self.right = child
 
     def can_be_neighbour(self):
-        return not (self.right and self.left)
+        self.show()
+        if self.right is None:
+            return True
+        elif self.left is None:
+            return True
+        return False
+
+    def show(self):
+        print(self.address)
+        if self.left:
+            print(self.left.address)
+        if self.right:
+            print(self.right.address)
 
 
 class NetworkGraph:
@@ -73,8 +85,8 @@ class NetworkGraph:
 
         while to_visit:
             current = to_visit.pop(0)
-
-            if current.can_be_neghbour():
+            print(current.address, current.can_be_neighbour())
+            if current.can_be_neighbour():
                 self.add_node(sender[0], sender[1], current.address)
                 return current
 
@@ -92,6 +104,7 @@ class NetworkGraph:
 
         while to_visit:
             current = to_visit.pop(0)
+
             if current.address == address:
                 return current
 
@@ -113,11 +126,21 @@ class NetworkGraph:
     def remove_node(self, node_address):  # TODO
         node = self.find_node(node_address[0], node_address[1])
         node.alive = False
+
         if node.right:
-            self.remove_node(node.right.address)
+            self.turn_off_subtree(node.right.address)
         if node.left:
-            self.remove_node(node.left.address)
+            self.turn_off_subtree(node.left.address)
         return
+
+    def turn_off_subtree(self, node_address):
+        graph_node = self.find_node(node_address[0], node_address[1])
+        graph_node.alive = False
+
+        if graph_node.right:
+            self.turn_off_subtree(graph_node.right.address)
+        if graph_node.left:
+            self.turn_off_subtree(graph_node.left.address)
 
     def add_node(self, ip, port, father_address):
         """
@@ -145,4 +168,18 @@ class NetworkGraph:
         father.add_child(new_node)
 
 
+
+    def show(self):
+        print('traversal')
+        root = self.root
+        to_visit = [root]
+
+        while to_visit:
+            current = to_visit.pop(0)
+            print(current.address)
+
+            if current.left:
+                to_visit.append(current.left)
+            if current.right:
+                to_visit.append(current.right)
 

@@ -49,6 +49,7 @@ class Node:
         :return:
         """
         self.out_buff.append(message)
+        # print('message added to node buff successfully')
 
     def close(self):
         """
