@@ -34,7 +34,6 @@ class GraphNode:
             self.right = child
 
     def can_be_neighbour(self):
-        self.show()
         if self.right is None:
             return True
         elif self.left is None:
@@ -85,9 +84,7 @@ class NetworkGraph:
 
         while to_visit:
             current = to_visit.pop(0)
-            print(current.address, current.can_be_neighbour())
             if current.can_be_neighbour():
-                self.add_node(sender[0], sender[1], current.address)
                 return current
 
             if current.left:
@@ -161,7 +158,7 @@ class NetworkGraph:
         :return:
         """
         father = self.find_node(father_address[0], father_address[1])
-
+        # print('father', father.address)
         new_node = GraphNode((ip, port))
         new_node.set_parent(father)
 
