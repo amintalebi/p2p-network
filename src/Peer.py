@@ -15,6 +15,8 @@ import threading
 
 
 class Peer:
+    DAEMON_THREAD_WAIT_TIME = 4
+    MAXIMUM_WAIT_TIME = 2 * 2 * 8 + 4
 
     def __init__(self, server_ip, server_port, is_root=False, root_address=None):
         """
@@ -48,7 +50,7 @@ class Peer:
         self.stream = Stream(server_ip, server_port, root_address)
         self.packet_factory = PacketFactory()
         self.ui = UserInterface()
-
+        self.ui.daemon = True
         self.is_root = is_root
         self.parent_address = None
         self.children = []
@@ -57,11 +59,17 @@ class Peer:
         self.registered_peers = None
 
         self.waiting_for_hello_back = False
+        self.last_sent_hello_time = None
         self.reunion_daemon = threading.Thread(target=self.run_reunion_daemon)
+        self.reunion_daemon.daemon = True
 
         if is_root:
-            self.network_graph = NetworkGraph(GraphNode((server_ip, server_port)))
+            root_graph_node = GraphNode(self.address)
+            root_graph_node.depth = 0
+            self.network_graph = NetworkGraph(root_graph_node)
             self.registered_peers = dict()
+            self.last_received_hello_times = dict()
+            self.reunion_daemon.start()
         elif root_address is not None:
             self.stream.add_node(root_address, set_register_connection=True)
 
@@ -112,6 +120,8 @@ class Peer:
                 print('sending', advertise_packet.get_buf())
                 self.stream.add_message_to_out_buff(self.root_address, advertise_packet.get_buf(),
                                                     is_register_node=True)
+            elif cmd == 'suicide':
+                exit(1)
             i += 1
 
         self.ui.buffer = self.ui.buffer[ui_buffer_snapshot_size:]
@@ -176,7 +186,34 @@ class Peer:
 
         :return:
         """
-        pass
+
+        while True:
+            if self.is_root:
+                for peer_address, last_time in list(self.last_received_hello_times.items()):
+                    elapsed_time = time.time() - last_time
+                    if elapsed_time > self.MAXIMUM_WAIT_TIME:
+                        self.network_graph.remove_node(peer_address)
+            elif self.parent_address is not None:
+                if not self.waiting_for_hello_back:
+                    hello_packet = self.packet_factory.new_reunion_packet(Packet.BODY_REQ, self.address, [self.address])
+                    self.stream.add_message_to_out_buff(self.parent_address, hello_packet.get_buf())
+                    self.last_sent_hello_time = time.time()
+                    self.waiting_for_hello_back = True
+                else:
+                    elapsed_time = time.time() - self.last_sent_hello_time
+                    if elapsed_time > self.MAXIMUM_WAIT_TIME:
+                        advertise_packet = self.packet_factory.new_advertise_packet(Packet.BODY_REQ, self.address,
+                                                                                    self.address)
+                        self.stream.add_message_to_out_buff(self.root_address, advertise_packet.get_buf(),
+                                                            is_register_node=True)
+                        self.stream.remove_node(
+                            self.stream.get_node_by_server(self.parent_address[0], self.parent_address[1]))
+                        self.parent_address = None
+                        for child in self.children:
+                            self.stream.remove_node(self.stream.get_node_by_server(child[0], child[1]))
+                        self.waiting_for_hello_back = False
+
+            time.sleep(self.DAEMON_THREAD_WAIT_TIME)
 
     def send_broadcast_packet(self, broadcast_packet):
         """
@@ -222,7 +259,7 @@ class Peer:
             print('body length in header:', packet.get_length())
             print('real body length:', len(packet.get_body()))
             return
-
+        print(time.time(), end=' ')
         if packet_type == Packet.REGISTER:
             print('register packet received')
             self.__handle_register_packet(packet)
@@ -298,8 +335,12 @@ class Peer:
                                                                        Node.parse_address(neighbour_address))
             message = response_packet.get_buf()
             self.stream.add_message_to_out_buff(packet.get_source_server_address(), message, is_register_node=True)
-            self.network_graph.add_node(packet.get_source_server_ip(), int(packet.get_source_server_port()),
+            self.network_graph.add_node(packet.get_source_server_ip(), packet.get_source_server_port(),
                                         neighbour_address)
+            self.network_graph.turn_on_node(packet.get_source_server_address())
+
+            self.last_received_hello_times[packet.get_source_server_address()] = time.time()
+
         else:
             if len(body_str) != 23 or body_str[:3] != Packet.BODY_RES:
                 return
@@ -311,7 +352,9 @@ class Peer:
             message = join_packet.get_buf()
             self.stream.add_message_to_out_buff(self.parent_address, message)
 
-            self.reunion_daemon.start()
+            self.waiting_for_hello_back = False
+            if not self.reunion_daemon.is_alive():
+                self.reunion_daemon.start()
 
     def __handle_register_packet(self, packet):
         """
@@ -389,12 +432,14 @@ class Peer:
                                           packet.get_source_server_port()) not in self.stream.nodes.values():
             print('source not found in stream nodes')
             return
-        print('New message received from', packet.get_source_server_address(), ':', packet.get_body())
+        message = packet.get_body()
+        print('New message received from', packet.get_source_server_address(), ':', message)
+        message_packet = self.packet_factory.new_message_packet(message, self.address)
         for child in self.children:
             if child != packet.get_source_server_address():
-                self.stream.add_message_to_out_buff(child, packet.get_buf())
+                self.stream.add_message_to_out_buff(child, message_packet.get_buf())
         if not self.is_root and self.parent_address != packet.get_source_server_address():
-                self.stream.add_message_to_out_buff(self.parent_address, packet.get_buf())
+            self.stream.add_message_to_out_buff(self.parent_address, message_packet.get_buf())
 
     def __handle_reunion_packet(self, packet):
         """
@@ -428,7 +473,7 @@ class Peer:
         path_peers_str = body_str[5:]
         path_peers = []
 
-        for i in range(len(path_peers_str), 20):
+        for i in range(0, len(path_peers_str), 20):
             ip = path_peers_str[i:i + 15]
             port = path_peers_str[i + 15:i + 20]
             path_peers.append((ip, port))
@@ -437,10 +482,13 @@ class Peer:
             if body_str[0:3] != Packet.BODY_REQ:
                 return
 
+            self.last_received_hello_times[packet.get_source_server_address()] = time.time()
+
             path_peers.reverse()
             hello_back_packet = self.packet_factory.new_reunion_packet(Packet.BODY_RES, self.address, path_peers)
             message = hello_back_packet.get_buf()
             self.stream.add_message_to_out_buff(path_peers[0], message)
+
         else:
             if body_str[0:3] == Packet.BODY_REQ:
                 path_peers.append(self.address)
@@ -478,8 +526,8 @@ class Peer:
         source_address = packet.get_source_server_address()
         self.stream.add_node(source_address)
         self.children.append(source_address)
-        if len(self.children) > 2:
-            raise Exception('protection forgotten. excessive child!')
+        # if len(self.children) > 2:
+        #     raise Exception('protection forgotten. excessive child!')
 
     def __get_neighbour(self, sender):
         """

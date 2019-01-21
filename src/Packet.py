@@ -345,7 +345,9 @@ class PacketFactory:
         header = '|'.join([str(Packet.VERSION), str(Packet.REUNION), str(packet_length), source_ip, source_port])
 
         number_of_entries = str(len(nodes_array)).zfill(2)
-        entries = str(str(ip) + str(port) for ip, port in nodes_array)
+        entries = ''
+        for ip, port in nodes_array:
+            entries += str(ip) + str(port)
         body = type + number_of_entries + entries
 
         string_buffer = '|'.join([header, body])

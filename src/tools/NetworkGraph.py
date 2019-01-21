@@ -14,12 +14,10 @@ class GraphNode:
         self.right = None
         self.left = None
         self.alive = False
+        self.depth = None
 
     def set_parent(self, parent):
         self.parent = parent
-
-    def set_address(self, new_address):
-        self.address = new_address
 
     def __reset(self):
         self.parent = None
@@ -34,10 +32,11 @@ class GraphNode:
             self.right = child
 
     def can_be_neighbour(self):
-        if self.right is None:
-            return True
-        elif self.left is None:
-            return True
+        if self.alive:
+            if self.right is None:
+                return True
+            elif self.left is None:
+                return True
         return False
 
     def show(self):
@@ -74,24 +73,38 @@ class NetworkGraph:
 
         """
 
-        try:
-            assert self.find_node(sender[0], sender[1]) is None
-        except AssertionError:
-            print('sender is already in network graph')
+        node = self.find_node(sender[0], sender[1])
+        if node is None:
 
-        root = self.root
-        to_visit = [root]
+            root = self.root
+            to_visit = [root]
 
-        while to_visit:
-            current = to_visit.pop(0)
-            if current.can_be_neighbour():
-                return current
+            while to_visit:
+                current = to_visit.pop(0)
+                if current.can_be_neighbour():
+                    return current
 
-            if current.left:
-                to_visit.append(current.left)
-            if current.right:
-                to_visit.append(current.right)
-        return None
+                if current.left:
+                    to_visit.append(current.left)
+                if current.right:
+                    to_visit.append(current.right)
+            return None
+
+        elif node is not None:
+            if not node.alive:
+                root = self.root
+                to_visit = [root]
+
+                while to_visit:
+                    current = to_visit.pop(0)
+                    if current.can_be_neighbour():
+                        return current
+
+                    if current.left:
+                        to_visit.append(current.left)
+                    if current.right:
+                        to_visit.append(current.right)
+                return None
 
     def find_node(self, ip, port):
         address = (ip, port)
@@ -114,15 +127,29 @@ class NetworkGraph:
 
     def turn_on_node(self, node_address):
         node = self.find_node(node_address[0], node_address[1])
+        if node is None:
+            return
+
         node.alive = True
 
     def turn_off_node(self, node_address):
         node = self.find_node(node_address[0], node_address[1])
+        if node is None:
+            return
+
         node.alive = False
 
-    def remove_node(self, node_address):  # TODO
+    def remove_node(self, node_address):
         node = self.find_node(node_address[0], node_address[1])
-        node.alive = False
+        if node is None:
+            return
+
+        parent = node.parent
+
+        if node == parent.right:
+            parent.right = None
+        elif node == parent.left:
+            parent.left = None
 
         if node.right:
             self.turn_off_subtree(node.right.address)
@@ -132,12 +159,17 @@ class NetworkGraph:
 
     def turn_off_subtree(self, node_address):
         graph_node = self.find_node(node_address[0], node_address[1])
+        if graph_node is None:
+            return
+
         graph_node.alive = False
 
         if graph_node.right:
             self.turn_off_subtree(graph_node.right.address)
         if graph_node.left:
             self.turn_off_subtree(graph_node.left.address)
+
+        return
 
     def add_node(self, ip, port, father_address):
         """
@@ -152,19 +184,22 @@ class NetworkGraph:
         :param father_address: Father address of the new node
 
         :type ip: str
-        :type port: int
+        :type port: str
         :type father_address: tuple
 
         :return:
         """
         father = self.find_node(father_address[0], father_address[1])
-        # print('father', father.address)
+
+        if father is None:
+            return
+
+
         new_node = GraphNode((ip, port))
         new_node.set_parent(father)
+        new_node.depth = father.depth + 1
 
         father.add_child(new_node)
-
-
 
     def show(self):
         print('traversal')
@@ -179,4 +214,3 @@ class NetworkGraph:
                 to_visit.append(current.left)
             if current.right:
                 to_visit.append(current.right)
-
